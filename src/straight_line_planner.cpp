@@ -90,7 +90,7 @@ void StraightLine::deactivate()
 nav_msgs::msg::Path StraightLine::createPlan(
   const geometry_msgs::msg::PoseStamped & start,
   const geometry_msgs::msg::PoseStamped & goal,
-  std::function<bool()> /*cancel_checker*/)
+  std::function<bool()> cancel_checker)
 {
   nav_msgs::msg::Path global_path;
 
@@ -109,9 +109,35 @@ nav_msgs::msg::Path StraightLine::createPlan(
     return global_path;
   }
 
+  // Corner case of the start(x,y) = goal(x,y)
+  if (start.pose.position.x == goal.pose.position.x &&
+    start.pose.position.y == goal.pose.position.y)
+  {
+    global_path.header.stamp = node_->now();
+    global_path.header.frame_id = global_frame_;
+    geometry_msgs::msg::PoseStamped pose;
+    pose.header = global_path.header;
+    pose.pose.position.z = 0.0;
+
+    pose.pose = start.pose;
+    // if we have a different start and goal orientation, set the unique path pose to the goal
+    // orientation, unless use_final_approach_orientation=true where we need it to be the start
+    // orientation to avoid movement from the local planner
+    if (start.pose.orientation != goal.pose.orientation) {
+      pose.pose.orientation = goal.pose.orientation;
+    }
+    global_path.poses.push_back(pose);
+    return global_path;
+  }
+
   global_path.poses.clear();
   global_path.header.stamp = node_->now();
   global_path.header.frame_id = global_frame_;
+
+  RCLCPP_DEBUG(
+    node_->get_logger(), "Making plan from (%.2f,%.2f) to (%.2f,%.2f)",
+    start.pose.position.x, start.pose.position.y, goal.pose.position.x, goal.pose.position.y);
+
   // calculating the number of loops for current value of interpolation_resolution_
   int total_number_of_loop = std::hypot(
     goal.pose.position.x - start.pose.position.x,

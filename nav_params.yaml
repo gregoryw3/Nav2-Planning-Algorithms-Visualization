@@ -1,0 +1,7 @@
+planner_server:
+  ros__parameters:
+    plugins: ["GridBased"]
+    use_sim_time: True
+    GridBased:
+      plugin: "nav2_straightline_planner::StraightLine"
+      interpolation_resolution: 0.1
